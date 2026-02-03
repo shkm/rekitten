@@ -29,5 +29,4 @@ STATE_FILE = REKITTEN_STATE_DIR / "state.json"
 LOG_FILE = REKITTEN_STATE_DIR / "rekitten.log"
 
 # Behavior
-DEBOUNCE_SECONDS = float(os.environ.get("REKITTEN_DEBOUNCE", "2.0"))
 DEBUG = os.environ.get("REKITTEN_DEBUG", "").lower() in ("1", "true", "yes")

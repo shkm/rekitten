@@ -3,38 +3,22 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from .config import SESSION_FILE, STATE_FILE, REKITTEN_STATE_DIR
 from .logger import get_logger
 
+if TYPE_CHECKING:
+    from kitty.boss import Boss
+
 log = get_logger(__name__)
 
 
-def get_kitty_state() -> list[dict[str, Any]] | None:
-    """Get current Kitty state via `kitten @ ls`."""
-    try:
-        result = subprocess.run(
-            ["kitten", "@", "ls"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode != 0:
-            log.error(f"kitten @ ls failed: {result.stderr}")
-            return None
-        return json.loads(result.stdout)
-    except subprocess.TimeoutExpired:
-        log.error("kitten @ ls timed out")
-        return None
-    except json.JSONDecodeError as e:
-        log.error(f"Failed to parse kitten @ ls output: {e}")
-        return None
-    except FileNotFoundError:
-        log.error("kitten command not found")
-        return None
+def get_kitty_state_from_boss(boss: "Boss") -> list[dict[str, Any]]:
+    """Get Kitty state directly from the boss object."""
+    # boss.list_os_windows() returns the same structure as `kitten @ ls`
+    return list(boss.list_os_windows())
 
 
 def _get_window_cwd(window: dict[str, Any]) -> str | None:
@@ -218,13 +202,17 @@ def generate_session_file(os_windows: list[dict[str, Any]]) -> str:
             lines.append("new_os_window")
 
         for j, tab in enumerate(os_window.get("tabs", [])):
+            title = tab.get("title", "")
+
             if j > 0:
                 lines.append("")
-                title = tab.get("title", "")
                 if title:
                     lines.append(f"new_tab {title}")
                 else:
                     lines.append("new_tab")
+            elif title:
+                # First tab: use title command
+                lines.append(f"title {title}")
 
             layout = tab.get("layout", "splits")
             lines.append(f"layout {layout}")
@@ -295,13 +283,18 @@ def generate_session_file(os_windows: list[dict[str, Any]]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def save_state() -> bool:
+def save_state(boss: "Boss") -> bool:
     """Save current Kitty state to session file."""
     log.debug("Saving state...")
 
-    state = get_kitty_state()
-    if state is None:
-        log.error("Failed to get Kitty state")
+    try:
+        state = get_kitty_state_from_boss(boss)
+    except Exception as e:
+        log.error(f"Failed to get Kitty state: {e}")
+        return False
+
+    if not state:
+        log.warning("No state returned from boss")
         return False
 
     os_windows = extract_tab_cwds(state)
