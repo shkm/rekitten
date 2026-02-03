@@ -91,13 +91,21 @@ comment_out_existing() {
     fi
 }
 
-# Add config line
+# Add or update config line
 add_config_line() {
     local line="$1"
     local pattern="$2"
 
     if grep -q "^${pattern}" "$KITTY_CONF" 2>/dev/null; then
-        warn "Config already contains: $pattern (skipping)"
+        # Check if the exact line already exists
+        if grep -qF "$line" "$KITTY_CONF" 2>/dev/null; then
+            info "Config already has: $line"
+        else
+            # Update existing line to the correct value
+            local tmp="$KITTY_CONF.tmp"
+            sed "s|^${pattern}.*|${line}|" "$KITTY_CONF" > "$tmp" && mv "$tmp" "$KITTY_CONF"
+            info "Updated kitty.conf: $line"
+        fi
     else
         echo "$line" >> "$KITTY_CONF"
         info "Added to kitty.conf: $line"
