@@ -37,7 +37,6 @@ Then restart Kitty.
 ## Uninstallation
 
 ```bash
-cd ~/repos/rekitten
 ./uninstall.sh
 ```
 
